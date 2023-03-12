@@ -1,0 +1,419 @@
+\documentclass[a4paper,twoside]{ctexart}
+\usepackage{geometry}
+\geometry{margin=1cm,vmargin={0pt,1cm}}
+\setlength{\topmargin}{-2cm}
+\setlength{\paperheight}{23cm}
+\setlength{\paperwidth}{18cm}
+\setlength{\textheight}{19.6cm}
+\setlength{\textwidth}{15cm}
+\usepackage{makecell}
+%\usepackage{fancyhdr}
+\usepackage{siunitx}
+\usepackage{amssymb}
+\usepackage{indentfirst}
+\setlength{\parindent}{0.5em}
+
+\pagenumbering{arabic} 
+
+% useful packages.
+\usepackage{multirow}
+\usepackage{caption}
+\usepackage{mathrsfs}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{enumerate}
+\usepackage{xcolor,graphicx,float,subfigure}
+\usepackage{epstopdf}
+\usepackage{multicol}
+\usepackage{fancyhdr}
+\usepackage{layout}
+\usepackage{listings}
+\usepackage{dsfont}
+\lstset{language=Matlab}
+\lstset{breaklines}
+\lstset{extendedchars=false}
+\usepackage[colorlinks,linkcolor=blue]{hyperref}
+\usepackage{xcolor}
+%\usepackage{cite}
+%\usepackage[numbers,sort&compress]{natbib} 
+%\setcitestyle{open={},close={}}
+%\usepackage{natbibspacing}
+%\renewcommand{\refname}{}
+\usepackage{anyfontsize}
+
+\usepackage{tikz}
+\usetikzlibrary{calc}
+\usetikzlibrary{arrows.meta}
+\tikzset{
+  dot/.style={
+    circle, fill=black, inner sep=1pt, outer sep=0pt
+  },
+  dot label/.style={
+    circle, inner sep=0pt, outer sep=1pt
+  }
+  arrow1/.style = {
+    draw = black, thick, -{Latex[length = 4mm, width = 1.5mm]},
+  }
+}
+
+\newtheorem{theorem}{定理}[section]
+\newtheorem{corollary}[theorem]{推论}
+\newtheorem{lemma}[theorem]{引理}
+\newtheorem{definition}[theorem]{定义}
+\newtheorem{proposition}[theorem]{性质}
+\newtheorem{example}[theorem]{例子}
+\newtheorem{notation}[theorem]{记号}
+\newtheorem{algorithm}[theorem]{算法}
+
+
+\newcommand{\dif}{\mathrm{d}}
+\newcommand{\avg}[1]{\left\langle #1 \right\rangle}
+\newcommand{\difFrac}[2]{\frac{\dif #1}{\dif #2}}
+\newcommand{\pdfFrac}[2]{\frac{\partial #1}{\partial #2}}
+\newcommand{\OFL}{\mathrm{OFL}}
+\newcommand{\UFL}{\mathrm{UFL}}
+\newcommand{\fl}{\mathrm{fl}}
+\newcommand{\op}{\odot}
+\newcommand{\Eabs}{E_{\mathrm{abs}}}
+\newcommand{\Erel}{E_{\mathrm{rel}}}
+
+\newcommand{\Zero}{\hat{0}}
+\newcommand{\One}{\hat{1}}
+\newcommand{\Int}{\mathrm{int}}
+\newcommand{\unitV}{\mathds{1}}
+
+\newcommand{\bmi}{\mathbf{i}}
+\newcommand{\bmj}{\mathbf{j}}
+\newcommand{\bmn}{\mathbf{n}}
+
+\newcommand{\dist}[2]{\text{dist}\left(#1, #2\right)}
+\newcommand{\scientific}[2]{#1 \times 10^{#2}}
+
+
+%\newcommand{\Dim}{{\mathbf{D}}}
+\newcommand{\Dim}{{\scriptsize \textsf{D}}}
+\newcommand{\me}{\mathrm{e}}
+\newcommand{\mi}{\mathrm{i}}
+
+%\newcommand{\mod}{\mathrm{mod}}
+\newcommand{\curve}[1]{\widetilde{#1}}
+%\newcommand{\dt}{\delta t}
+\newcommand{\dt}{\tau}
+\newcommand{\isCovered}{\mathbin{ < \! \! \! \! \cdot }}
+%\newcommand{\cIncluded}{\mathbin{ \prec \! \! \! \cdot }}
+\newcommand{\coveredBy}{\lhd}
+%\newcommand{\regrz}[1]{\mathrm{cl}\left(\mathrm{int}\left(#1\right)\right)}
+\newcommand{\regrz}[1]{\mathrm{reg}\left(#1\right)}
+%\newcommand{\sgncup}{\ \hat{\cup} \ }
+\newcommand{\Span}{\mathrm{span}}
+\newcommand{\timeline}[2]{\phi_{t_0}^{#1}\left( #2 \right)}
+\newcommand{\timeBP}[1]{\overleftarrow{#1}}
+\newcommand{\timeBPA}[1]{\mathring{\overleftarrow{#1}}}
+\newcommand{\streak}[2]{\Psi_{t_0}^{#1}\left(#2\right)}
+\newcommand{\timelineA}[2]{\mathring{\phi}_{t_0,#2}^{#1}}
+\newcommand{\DRLN}[1]{{\cal D}_{\curve{#1}}}
+\newcommand{\DRLLN}[1]{{\cal D}_{\overline{#1}}}
+\newcommand{\DRLNA}[1]{\mathring{\cal D}_{\curve{#1}}}
+%\newcommand{\oplusDR}{\,\overline{\oplus}\,}
+\newcommand{\oplusDR}{\,\bar{\oplus}\,}
+\newcommand{\qo}{\hat{q}}
+\newcommand{\xo}{\hat{x}}
+\newcommand{\yo}{\hat{y}}
+\newcommand{\closure}[1]{\textrm{cl}\left(#1\right)}
+\newcommand{\vertexSequence}[4]{
+  \left( #1 \rightarrow #2 \rightarrow #3 \rightarrow #4 \rightarrow #1\right)}
+
+\newcommand{\ppSpace}{\Pi_{<\kappa,\bm{\xi},\bm{\nu}}}
+\newcommand{\pnSpace}{\mathbb{P}_{<\kappa}}
+\newcommand{\pnSpaceK}[1]{\mathbb{P}_{#1}}
+
+\newcommand{\Pyr}[2]{\textrm{Pyr}_{\cal{#1}}\left(\mathbf{#2}\right)}
+
+%\pagestyle{plain}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[LE,RO]{\textbf{\thepage}}
+
+\makeatletter
+\newcommand\sixteen{\@setfontsize\sixteen{17pt}{6}}
+\renewcommand{\maketitle}{\bgroup\setlength{\parindent}{0pt}
+\begin{flushleft}
+\sixteen\bfseries \@title
+\medskip
+\end{flushleft}
+\textit{\@author}
+\egroup}
+\makeatother
+
+\CTEXsetup[format={\Large\bfseries}]{section}
+
+\title{刷题算法总结}
+
+
+\begin{document}
+\maketitle
+
+\section{查找}
+\label{sec:Search}
+
+\subsection{二分查找}
+\label{sec:BinarySearch}
+\textbf{对应题目：}
+\begin{itemize}
+\item 33. 搜索\textbf{旋转}排序数组
+\item \textbf{34. 在排序数组中查找元素第一个和最后一个出现位置}
+\item 74. 搜索二维矩阵
+\item 153. 寻找旋转排序数组中的最小值
+\item \textbf{162. 寻找峰值 （涉及Lambda函数技巧）}
+\end{itemize}
+
+涉及到的标准库： binary\_search()，upper\_bound （大于），以及 lower\_bound（不小于）
+
+注意细节，ans永远取有可能是最后结果的那个，举个例子
+
+\begin{verbatim}
+int binarySearch(vector<int>& nums, int target, bool lower) {
+        int left = 0, right = (int)nums.size() - 1, ans = (int)nums.size();
+        while (left <= right) {
+            int mid = (left + right) / 2;
+            if (nums[mid] > target || (lower && nums[mid] >= target)) {
+                right = mid - 1;
+                ans = mid;
+            } else {
+                left = mid + 1;
+            }
+        }
+        return ans;
+    }
+\end{verbatim}
+
+另外，不一定有序数组才可以使用二分算法，例如寻找数组旋转点、寻找
+峰值。
+
+
+\section{双指针}
+
+双指针是指在遍历对象时，使用两个或多个指针进行遍历及相应的操作。大多用
+于数组操作，这利用了数组连序性的特点。双指针常用来降低算法的时间复杂度，
+因为使用两个指针可以避免多层循环。通常有对撞指针和快慢指针。
+
+\textbf{对应题目：}
+\begin{itemize}
+\item \textbf{82.删除排序链表重复元素}
+\item 15.三数之和
+\item \textbf{844. 比较含退格字符}
+\item 986.区间列表交集
+\item \textbf{11.盛最多水的容器}
+\end{itemize}
+
+双指针的重点在于如何设置双指针，指针每一步该如何移动，包括方向和速度。
+
+\subsection{滑动窗口}
+
+滑动窗口就是暴力解法的优化，是在给定特定大小的字符串或者数组上操作，而
+不在整个数组上操作。进而减少了问题的复杂度和嵌套深度。
+
+\textbf{对应题目：}
+\begin{itemize}
+\item \textbf{438. 找到字符串中所有异位子字符}
+\item \textbf{713. 乘积小于k的子数组}
+\item 209. 长度最小的子数组
+\end{itemize}
+
+\section{BFS/DFS}
+
+\subsection{岛屿网格类问题}
+
+可以与二叉树的DFS进行类比，可以通过额外数组进行辅助，例如存储是否已经
+被遍历过、改变网格值表示是否为同一个岛屿等等。
+
+\textbf{对应题目：}
+\begin{itemize}
+\item 200.岛屿数量
+\item 547.省份数量
+\item 827.填海造陆
+\item \textbf{1091. 二进制矩阵中的最短路径} 注意当把它加入到queue的时
+  候就直接visited=1。
+\item \textbf{130.被围绕的区域}  注意dfs的时候首先判断要不要跳过它，跳
+  过要注意齐全，是否满足条件，是否越界，是否以及visited。
+\end{itemize}
+
+\subsection{二叉树上的操作}
+
+BFS的话使用queue,需要逐层操作的时候while内部要嵌套一个for循环
+
+对应题目：
+\begin{itemize}
+\item 117.填充每个节点的下一个右侧节点指针
+\item 572.另一棵树的子树（有高端解法）（KMP算法对比字符串）
+\end{itemize}
+
+\section{递归/回溯}
+
+\subsection{回溯}
+
+回溯的步骤：
+\begin{itemize}
+\item 寻找出递归树以及结束条件
+\item 找选择列表
+\item 判断是否剪枝
+\item 做出选择
+\item 撤销选择
+\end{itemize}
+
+\begin{verbatim}
+void backtracking(参数) {
+    if (终止条件) {
+        存放结果;
+        return;
+    }
+
+    for (选择：本层集合中元素（树中节点孩子的数量就是集合的大小）) {
+        处理节点;
+        backtracking(路径，选择列表); // 递归
+        回溯，撤销处理结果
+    }
+}
+
+\end{verbatim}
+
+有时候也要用到visited避免重复搜索，注意遇到重复的时候下一步该做什么，
+而不是直接return。 另外，回溯时只有遍历到最后或者条件达成的
+时候才将结果放入到vector中。
+
+\textbf{对应题目：}
+\begin{itemize}
+\item \textbf{797. 所有可能的路径}
+\item 78. 子集
+\item 90. 子集II（包含重复元素）
+\item \textbf{46. 全排列}
+\item \textbf{47. 全排列II}
+\item 39.组合求和
+\item \textbf{40.组合求和II}
+\item 17. 电话号码
+\item 22. 括号生成
+\item 79. 单词搜索
+\end{itemize}
+
+
+\section{动态规划}
+
+动态规划分为以下几步：
+\begin{enumerate}
+\item 确定dp数组及其下标的含义
+\item 确定递推公式
+\item dp数组如何初始化
+\item 确定遍历顺序
+\item 举例推导dp数组
+\end{enumerate}
+
+\subsection{基础题目}
+着重注意使用滚动数组技巧。
+
+\begin{itemize}
+\item 509. 斐波那契数列
+\item \textbf{70. 爬楼梯}
+\item 746. 最小花费爬楼梯
+\item 62. 不同路径，63.不同路径II
+\item 343. 整数拆分
+\item \textbf{96. 不同的二叉搜索树}
+\end{itemize}
+
+\subsection{01背包问题}
+每个物品只能放一次，始终注意如何将一个问题转化为01背包问题，滚动数组要
+倒序遍历。
+
+\begin{itemize}
+\item \item \textbf{416. 分割等和}
+\item \textbf{1049. 最后一块石头}
+\item \textbf{494. 目标和}
+\item \textbf{474. 一和零}
+\end{itemize}
+
+\subsection{完全背包问题}
+每个物品可以放无数次，滚动数组要正序遍历。\textbf{着重注意初始化以及递
+  推！！！}
+
+关于方法个数的问题，先遍历背包是排列数，先遍历物品是组合数。
+
+\begin{itemize}
+\item \textbf{518. 零钱兑换II}
+\item \textbf{377. 组合总和IV}
+\item \textbf{70. 爬楼梯 加入一次可以爬1-m个台阶呢？ 排列数问题}
+\item 322. 零钱兑换
+\item \textbf{139.单词拆分} 也可以用回溯算法
+\item 279. 完全平方数
+\end{itemize}
+
+
+\subsection{打家劫舍}
+
+\begin{itemize}
+\item 198. 打家劫舍
+\item 213.打家劫舍II 
+\item 337.打家劫舍III  \textbf{树状dp} dp返回两个数，一个是不偷该节点
+  的最大利润，一个是偷该节点的最大利润
+\end{itemize}
+
+\subsection{股票}
+
+每天有多种状态，每一天每种状态所获得的最大利润都要记录下来
+
+\begin{itemize}
+\item \textbf{121. 买卖股票最佳时机， }   只能购买一次
+\item \textbf{122. 买卖股票最佳时机II，} 可以无数次购买
+\item \textbf{123. 买卖股票最佳时机III，} 最多购买两次（4种状态）
+\item \textbf{188. 买卖股票最佳时机IV，} 最多购买k次（2k种状态）
+\item \textbf{309. 买卖股票最佳时机含冰冻期，} 可以无数次购买但有一天冰
+  冻期（4种状态：持有股票、未持有股票但已经过了冰冻期、刚卖、冰冻期）
+\item \textbf{714.买卖股票最佳时机含手续费，} 和122很像
+
+\end{itemize}
+
+\subsection{子序列问题}
+
+\subsubsection{不连续子序列}
+
+注意dp的下标含义，思考为什么有时候需要记录以i结尾的子序列有时候不需要
+
+\begin{itemize}
+\item 最长上升子序列
+\item 最长公共子序列
+\item 不相交的线
+\end{itemize}
+
+\subsubsection{连续子序列}
+
+注意dp的下标是以i结尾的满足要求的子序列长度
+
+\begin{itemize}
+\item 674. 最长连续递增序列
+\item 718. 最长重复子数组
+\item 53. 最大子序和
+\end{itemize}
+
+\subsection{子序列问题}
+
+注意dp的下标含义
+
+\begin{itemize}
+\item 392. 判断子序列
+\item \textbf{115. 不同的子序列}
+\item 583. 两个字符串的删除操作
+\item \textbf{72. 编辑距离}
+\end{itemize}
+
+\subsection{回文}
+
+dp[i][j]表示[i,j]范围是否是回文或者长度
+\begin{itemize}
+\item \textbf{647. 回文子串}
+\item \textbf{516. 最长回文子序列长度}
+\end{itemize}
+
+\end{document}
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: t
+%%% End:

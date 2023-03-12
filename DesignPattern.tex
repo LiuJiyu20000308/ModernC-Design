@@ -1,0 +1,162 @@
+\documentclass[a4paper,twoside]{ctexart}
+\usepackage{geometry}
+\geometry{margin=1cm,vmargin={0pt,1cm}}
+\setlength{\topmargin}{-2cm}
+\setlength{\paperheight}{23cm}
+\setlength{\paperwidth}{18cm}
+\setlength{\textheight}{19.6cm}
+\setlength{\textwidth}{15cm}
+\usepackage{makecell}
+%\usepackage{fancyhdr}
+\usepackage{siunitx}
+\usepackage{amssymb}
+\usepackage{indentfirst}
+\setlength{\parindent}{0.5em}
+
+\pagenumbering{arabic} 
+
+% useful packages.
+\usepackage{multirow}
+\usepackage{caption}
+\usepackage{mathrsfs}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{enumerate}
+\usepackage{xcolor,graphicx,float,subfigure}
+\usepackage{epstopdf}
+\usepackage{multicol}
+\usepackage{fancyhdr}
+\usepackage{layout}
+\usepackage{listings}
+\usepackage{dsfont}
+\lstset{language=Matlab}
+\lstset{breaklines}
+\lstset{extendedchars=false}
+\usepackage[colorlinks,linkcolor=blue]{hyperref}
+\usepackage{xcolor}
+%\usepackage{cite}
+%\usepackage[numbers,sort&compress]{natbib} 
+%\setcitestyle{open={},close={}}
+%\usepackage{natbibspacing}
+%\renewcommand{\refname}{}
+\usepackage{anyfontsize}
+
+\usepackage{tikz}
+\usetikzlibrary{calc}
+\usetikzlibrary{arrows.meta}
+\tikzset{
+  dot/.style={
+    circle, fill=black, inner sep=1pt, outer sep=0pt
+  },
+  dot label/.style={
+    circle, inner sep=0pt, outer sep=1pt
+  }
+  arrow1/.style = {
+    draw = black, thick, -{Latex[length = 4mm, width = 1.5mm]},
+  }
+}
+
+\newtheorem{theorem}{定理}[section]
+\newtheorem{corollary}[theorem]{推论}
+\newtheorem{lemma}[theorem]{引理}
+\newtheorem{definition}[theorem]{定义}
+\newtheorem{proposition}[theorem]{性质}
+\newtheorem{example}[theorem]{例子}
+\newtheorem{notation}[theorem]{记号}
+\newtheorem{algorithm}[theorem]{算法}
+
+
+\newcommand{\dif}{\mathrm{d}}
+\newcommand{\avg}[1]{\left\langle #1 \right\rangle}
+\newcommand{\difFrac}[2]{\frac{\dif #1}{\dif #2}}
+\newcommand{\pdfFrac}[2]{\frac{\partial #1}{\partial #2}}
+\newcommand{\OFL}{\mathrm{OFL}}
+\newcommand{\UFL}{\mathrm{UFL}}
+\newcommand{\fl}{\mathrm{fl}}
+\newcommand{\op}{\odot}
+\newcommand{\Eabs}{E_{\mathrm{abs}}}
+\newcommand{\Erel}{E_{\mathrm{rel}}}
+
+\newcommand{\Zero}{\hat{0}}
+\newcommand{\One}{\hat{1}}
+\newcommand{\Int}{\mathrm{int}}
+\newcommand{\unitV}{\mathds{1}}
+
+\newcommand{\bmi}{\mathbf{i}}
+\newcommand{\bmj}{\mathbf{j}}
+\newcommand{\bmn}{\mathbf{n}}
+
+\newcommand{\dist}[2]{\text{dist}\left(#1, #2\right)}
+\newcommand{\scientific}[2]{#1 \times 10^{#2}}
+
+
+%\newcommand{\Dim}{{\mathbf{D}}}
+\newcommand{\Dim}{{\scriptsize \textsf{D}}}
+\newcommand{\me}{\mathrm{e}}
+\newcommand{\mi}{\mathrm{i}}
+
+%\newcommand{\mod}{\mathrm{mod}}
+\newcommand{\curve}[1]{\widetilde{#1}}
+%\newcommand{\dt}{\delta t}
+\newcommand{\dt}{\tau}
+\newcommand{\isCovered}{\mathbin{ < \! \! \! \! \cdot }}
+%\newcommand{\cIncluded}{\mathbin{ \prec \! \! \! \cdot }}
+\newcommand{\coveredBy}{\lhd}
+%\newcommand{\regrz}[1]{\mathrm{cl}\left(\mathrm{int}\left(#1\right)\right)}
+\newcommand{\regrz}[1]{\mathrm{reg}\left(#1\right)}
+%\newcommand{\sgncup}{\ \hat{\cup} \ }
+\newcommand{\Span}{\mathrm{span}}
+\newcommand{\timeline}[2]{\phi_{t_0}^{#1}\left( #2 \right)}
+\newcommand{\timeBP}[1]{\overleftarrow{#1}}
+\newcommand{\timeBPA}[1]{\mathring{\overleftarrow{#1}}}
+\newcommand{\streak}[2]{\Psi_{t_0}^{#1}\left(#2\right)}
+\newcommand{\timelineA}[2]{\mathring{\phi}_{t_0,#2}^{#1}}
+\newcommand{\DRLN}[1]{{\cal D}_{\curve{#1}}}
+\newcommand{\DRLLN}[1]{{\cal D}_{\overline{#1}}}
+\newcommand{\DRLNA}[1]{\mathring{\cal D}_{\curve{#1}}}
+%\newcommand{\oplusDR}{\,\overline{\oplus}\,}
+\newcommand{\oplusDR}{\,\bar{\oplus}\,}
+\newcommand{\qo}{\hat{q}}
+\newcommand{\xo}{\hat{x}}
+\newcommand{\yo}{\hat{y}}
+\newcommand{\closure}[1]{\textrm{cl}\left(#1\right)}
+\newcommand{\vertexSequence}[4]{
+  \left( #1 \rightarrow #2 \rightarrow #3 \rightarrow #4 \rightarrow #1\right)}
+
+\newcommand{\ppSpace}{\Pi_{<\kappa,\bm{\xi},\bm{\nu}}}
+\newcommand{\pnSpace}{\mathbb{P}_{<\kappa}}
+\newcommand{\pnSpaceK}[1]{\mathbb{P}_{#1}}
+
+\newcommand{\Pyr}[2]{\textrm{Pyr}_{\cal{#1}}\left(\mathbf{#2}\right)}
+
+%\pagestyle{plain}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[LE,RO]{\textbf{\thepage}}
+
+\makeatletter
+\newcommand\sixteen{\@setfontsize\sixteen{17pt}{6}}
+\renewcommand{\maketitle}{\bgroup\setlength{\parindent}{0pt}
+\begin{flushleft}
+\sixteen\bfseries \@title
+\medskip
+\end{flushleft}
+\textit{\@author}
+\egroup}
+\makeatother
+
+\CTEXsetup[format={\Large\bfseries}]{section}
+
+\title{Modern C++ Design}
+
+
+\begin{document}
+\maketitle
+
+
+\end{document}
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: t
+%%% End:
