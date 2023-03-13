@@ -1,0 +1,305 @@
+\section{Policy-Based Class Design}
+
+In brief, policy-based class design
+fosters assembling a class with complex behavior out of many little classes 
+(called policies), each of which
+takes care of only one behavioral or structural aspect.
+
+The generic SingletonHolder class \textbf{template} (Chapter
+6) uses policies for managing lifetime and thread safety. {SmartPtr} (Chapter 7) 
+is built almost entirely from policies. The \textbf{double-dispatch engine} in Chapter 11 
+uses policies for selecting various trade-offs. The
+generic \textbf{Abstract Factory} implementation in Chapter 9 uses a policy for choosing a
+creation method.
+
+\subsection{Failure of the Do-it-all Interface}
+
+Implementing everything under the umbrella of a do-it-all interface is not a good solution, for several
+reasons:
+
+\begin{itemize}
+    \item Intellectual overhead, sheer size, and inefficiency.
+    \item Loss of static type safety. A design should enforce most constraints at compile time. (No two singleton objects)
+\end{itemize}
+
+\subsection{Multiple Inheritance to the Rescue?}
+For example, the user would build a multi-threaded, reference-counted smart pointer
+class by inheriting some 
+\texttt{BaseSmartPtr} class and two classes: \texttt{MultiThreaded}
+and  \texttt{RefCounted}. Any experienced class 
+designer knows that such a naive design does not work.
+
+The problems with assembling separate features by using
+multiple inheritance are as follows:
+\begin{itemize}
+\item \textbf{Mechanics}. There is no boilerplate code to assemble the
+  inherited components in a controlled manner. \textbf{The language applies
+  simple superposition in combining the base classes and establishes a
+  set of simple rules for accessing their members.  }
+\item \textbf{Type information}. The base classes do not have enough type
+  information to carry out their tasks. 
+\item \textbf{State manipulation}. Various behavioral aspects implemented with
+  base classes must manipulate the same state. This means that they
+  must use virtual inheritance to inherit a base class that holds the
+  state. This complicates the design and makes it more rigid because
+  the premise was that user classes inherit library classes, not vice versa.
+\end{itemize}
+
+\subsection{Templates}
+
+Benefits:
+\begin{itemize}
+\item Class templates are customizable in ways not supported by
+  regular classes.
+\item for class templates with multiple parameters, you can use
+  partial template specialization.
+\end{itemize}
+
+As soon as you try to implement such designs, you stumble upon several
+problems that are not self-evident:
+\begin{itemize}
+\item You cannot specialize structure.
+\item Specialization of member functions does not scale: you cannot
+  specialize individual member functions for templates with multiple
+  template parameters.
+\item The library writer cannot provide multiple \textbf{default} values.
+\end{itemize}
+
+Multiple inheritance and templates foster complementary trade-offs:
+\begin{itemize}
+\item Multiple inheritance has scarce mechanics; templates have rich
+mechanics
+\item Multiple inheritance loses type information, which abounds
+in templates.
+\item Specialization of templates does not scale, but multiple
+inheritance scales quite nicely.
+\item You can provide only one default for
+a template member function, but you can write an unbounded 
+number of base classes.
+\end{itemize}
+
+\subsection{Policy Classes}
+
+A \textbf{policy} defines a class interface or a class template interface. The
+interface consists of one or all of the following: \textbf{inner type
+definitions, member functions, and member variables}. The
+implementations of a policy are called \textbf{policy classes}. Policy classes
+are not intended for stand-alone use; instead, they are inherited by,
+or contained within, other classes.
+
+\begin{verbatim}
+template <class T>
+struct OpNewCreator{
+  static T* Create(){
+    return new T;
+  }
+};
+
+template <class T>
+struct MallocCreator{
+  static T* Create(){
+    void* buf = std::malloc(sizeof(T));
+    if (!buf) return 0;
+    return new(buf) T;
+  }
+};
+
+template <class T>
+struct PrototypeCreator{
+  PrototypeCreator(T* pObj = 0):pPrototype_(pObj){}
+  T* Create(){
+    return pPrototype_ ? pPrototype_->Clone() : 0;
+  }
+  T* GetPrototype() { return pPrototype_; }
+  void SetPrototype(T* pObj) { pPrototype_ = pObj; }
+private:
+  T* pPrototype_;
+};
+\end{verbatim}
+
+The classes that use one or more policies are called hosts or
+\textbf{host classes}.
+
+\begin{verbatim}
+template <class CreationPolicy>
+class WidgetManager : public CreationPolicy{
+  ...
+};
+typedef WidgetManager< OpNewCreator<Widget> > MyWidgetMgr;
+\end{verbatim}
+
+\textbf{It is the user of \texttt{WidgetManager} who chooses the creation
+  policy}. This is the gist of policy-based class design.
+
+\subsection{Implementing Policy Classes with Template Template
+  Parameters}
+
+The policy's template argument is redundant. In this case, we can use
+\textbf{template template parameters} for specifying policies, as shown in the
+following:
+\begin{verbatim}
+template <template <class> class CreationPolicy = OpNewcreator>
+class WidgetManager : public CreationPolicy<Widget>{
+  ...
+};
+typedef WidgetManager<OpNewCreator> MyWidgetMgr;
+\end{verbatim}
+
+Using template template parameters with policy classes is not simply a
+matter of convenience; sometimes, it is essential that the host class
+have access to the template so that the host can instantiate it with a
+different type. For example:
+
+\begin{verbatim}
+template <template <class> class CreationPolicy = OpNewcreator>
+class WidgetManager : public CreationPolicy<Widget>{
+  void DoSomething(){
+    Gadget* pW = CreationPolicy<Gadget>().Create();
+  }
+};
+\end{verbatim}
+
+Benefits of using policies:
+\begin{itemize}
+\item you can change policies from theoutside as easily as changing a
+  template argument when you instantiate \texttt{WidgetManager}.
+\item you can provide your own policies that are specific to your
+  concrete application.
+\item Policies allow you to generate designs by combining simple
+  choices in a typesafe manner.
+\item the binding between a host class and its policies is done at
+  compile time, the code is tight and efficient, comparable to its
+  handcrafted equivalent.
+\end{itemize}
+
+\subsection{Destructors of Policy Classes}
+
+The user can automatically convert a host class to a policy and later
+\texttt{delete} that pointer. Unless the policy class defines a virtual
+destructor, applying delete to a pointer to the policy class has
+undefined behavior.
+
+Defining a virtual destructor for a policy, however, works against its
+static nature and hurts performance. The lightweight, effective
+solution that policies should use is to define a nonvirtual protected
+destructor:
+\begin{verbatim}
+template <class T>
+struct OpNewCreator{
+protected:
+  ~OpNewCreator() {}
+};
+\end{verbatim}
+
+Because the destructor is protected, \textbf{only derived classes can destroy
+policy objects}, so it's impossible for outsiders to apply delete to a
+pointer to a policy class.
+
+\subsection{Enriched Policies}
+
+The \texttt{Creator} policy prescribes only one member function,
+\texttt{Create}. However, \texttt{PrototypeCreator} defines two more functions:
+\texttt{GetPrototype} and \texttt{SetPrototype}.
+
+A user who uses a prototype-based Creator policy class can write the
+following code: 
+\begin{verbatim}
+typedef WidgetManager<PrototypeCreator> MyWidgetManager;
+
+Widget* pPrototype = ...;
+MyWidgetManager mgr;
+mgr.SetPrototype(pPrototype);
+\end{verbatim}
+
+If the user later decides to use a creation policy that does not
+support prototypes, \textbf{the compiler pinpoints the spots where the
+prototype-specific interface was used.} This is exactly what should be
+expected from a sound design.
+
+\subsection{Optional Functionality Through Incomplete Instantiation}
+
+If a member function of a class template is never used, \textbf{it is not even
+instantiated—the compiler does not look at it at all}, except perhaps
+for syntax checking.
+
+\begin{verbatim}
+template <template <class> class CreationPolicy>
+class WidgetManager : public CreationPolicy<Widget>{
+  void SwitchPrototype(Widget* pNewPrototype){
+    CreationPolicy<Widget>& myPolicy = *this;
+    delete myPolicy.GetPrototype();
+    myPolicy.SetPrototype(pNewPrototype);
+  }
+};
+\end{verbatim}
+The resulting context is very interesting:
+\begin{itemize}
+\item If the user instantiates \texttt{WidgetManager} with a Creator
+  policy class that does not support prototypes and tries to use
+  \texttt{SwitchPrototype}, a compile-time error occurs.
+\item  If the user instantiates \texttt{WidgetManager} with a Creator
+  policy class that does not support prototypes and does not try to
+  use \texttt{SwitchPrototype}, the program is valid.
+\end{itemize}
+This all means that \texttt{WidgetManager} can benefit from optional
+enriched interfaces but still work correctly with poorer interfaces.
+
+\subsection{Compatible and Incompatible Policies}
+
+Suppose you create two instantiations of \texttt{SmartPtr }:
+\texttt{FastWidgetPtr}, a pointer with out checking, and 
+\texttt{SafeWidgetPtr}, a pointer with checking before dereference.
+It is natural to accept the conversion from \texttt{FastWidgetPtr} to
+\texttt{SafeWidgetPtr}, but freely converting \texttt{SafeWidgetPtr}
+objects to \texttt{FastWidgetPtr} objects is dangerous. 
+
+The best, most scalable way to implement conversions between policies
+is to initialize and copy \texttt{SmartPtr} objects policy by policy,
+as shown below:
+
+\begin{verbatim}
+template<class T,template <class> class CheckingPolicy>
+class SmartPtr : public CheckingPolicy<T>{
+  template<class T1,template <class> class CP1,>
+  SmartPtr(const SmartPtr<T1, CP1>& other)
+    : pointee_(other.pointee_), CheckingPolicy<T>(other){ ... }
+};
+\end{verbatim}
+
+When you initialize a \texttt{SmartPtr<Widget, EnforceNotNull> } with a
+\texttt{SmartPtr<ExtendedWidget, NoChecking>}. The compiler tries to
+match \texttt{SmartPtr<ExtendedWidget, NoChecking>} to
+\texttt{EnforceNotNull}'s constructors.
+
+If \texttt{EnforceNotNull}
+implements a \textbf{constructor} that accepts a \texttt{NoChecking} object,
+then the compiler matches that constructor. If \texttt{NoChecking}
+implements a \textbf{conversion} operator to \texttt{EnforceNotNull}, that 
+conversion is invoked. In any other case, the code fails to compile.
+
+Although conversions from \texttt{NoChecking} to
+\texttt{EnforceNotNull} and even vice versa are quite sensible, some
+conversions don't make any sense at all.  As soon as you try to
+confine a pointer to another ownership policy, you break the invariant
+that makes reference counting work.
+
+In conclusion, conversions that change the ownership policy should not
+be allowed implicitly and should be treated with maximum care.
+
+\subsection{ Decomposing a Class into Policies}
+
+Two policies that do not interact with each other are orthogonal. By
+this definition, the Array and the Destroy policies are not
+orthogonal.
+
+Nonorthogonal policies are an imperfection you should strive to
+avoid. \textbf{They reduce compile-time type safety and complicate the design
+  of both the host class and the policy classes.}
+
+If you must use nonorthogonal policies, you can minimize dependencies
+by passing a policy class as an argument to another policy class's
+template function. However, this decreases encapsulation.
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "../DesignPattern.tex"
+%%% End:
