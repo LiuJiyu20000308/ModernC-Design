@@ -3,6 +3,8 @@
 
 \subsection{Compile-Time Assertions}
 
+\textbf{C++17 provides \texttt{static\_assert}}.
+
 The simplest solution to compile-time assertions works in C as well as in
 C++, relies on the fact that a zero-length array is illegal.
 
@@ -119,6 +121,591 @@ template <class T, class U> T Fun(U obj); // primary template
 template <class U> void Fun<void, U>(U obj); // illegal partial specialization
 template <class T> T Fun (Window obj); // legal (overloading)
 \end{verbatim}
+
+\subsection{Local Classes}
+
+\textbf{Local classes cannot define static member variables and cannot
+  access nonstatic local variables}. What makes local classes truly
+interesting is that you can use them in template functions. \textbf{Local
+classes defined inside template functions can use the template
+parameters of the enclosing function.}
+
+\begin{verbatim}
+class Interface{
+public:
+virtual void Fun() = 0;
+};
+template <class T, class P>
+Interface* MakeAdapter(const T& obj, const P& arg){
+  class Local : public Interface{
+  public:
+    Local(const T& obj, const P& arg): obj_(obj), arg_(arg) {}
+    virtual void Fun(){
+      obj_.Call(arg_);
+    }
+  private:
+     T obj_;
+     P arg_;
+  };
+  return new Local(obj, arg);
+}
+\end{verbatim}
+
+It can be easily proven that any idiom that uses a local class can be
+implemented using a template class outside the function. On the other
+hand, local classes can simplify implementations and improve locality
+of symbols.
+
+Local classes do have a unique feature, though: They are
+\textbf{final}. Outside users cannot derive from a class hidden in a
+function. Without local classes, you'd have to add an unnamed
+namespace in a separate translation unit.
+
+\subsection{Mapping Integral Constants to Types}
+
+\begin{verbatim}
+template <int v>
+struct Int2Type{
+enum { value = v };
+};
+\end{verbatim}
+
+\texttt{Int2Type} generates a distinct type for each distinct constant
+integral value passed.  You can use \texttt{Int2Type} whenever you
+need to "typify" an integral constant quickly. This way you can 
+\textbf{select different functions, depending on the result of a
+  compile-time calculation.} Effectively, you \textbf{achieve static
+  dispatching on a constant integral value. }
+
+For dispatching at runtime, you can use simple \texttt{if-else}
+statements or the \texttt{switch} statement.  However, the
+\texttt{if-else} statement requires both branches to compile
+successfully, even when the condition tested by \texttt{if} is known
+at compile time.
+
+\begin{verbatim}
+template <typename T, bool isPolymorphic>
+class NiftyContainer{
+  void DoSomething(){
+    T* pSomeObj = ...;
+    if (isPolymorphic){
+      T* pNewObj = pSomeObj->Clone();
+      ... polymorphic algorithm ...
+    }
+    else{
+      T* pNewObj = new T(*pSomeObj);
+      ... nonpolymorphic algorithm ...
+    }
+  }
+};
+\end{verbatim}
+
+The polymorphic algorithm uses \texttt{pObj->Clone()},
+\texttt{NiftyContainer::DoSomething }does not compile for any type
+that doesn't define a member function \texttt{Clone()}.
+
+If \texttt{T} has disabled its copy constructor (by making it
+private), if \texttt{T} is a polymorphic type and the nonpolymorphic
+code branch attempts \texttt{new T(*pObj)}, the code might fail to
+compile.
+
+\begin{verbatim}
+template <typename T, bool isPolymorphic>
+class NiftyContainer{
+private:
+  void DoSomething(T* pObj, Int2Type<true>){
+    T* pNewObj = pObj->Clone();
+    ... polymorphic algorithm ...
+  }
+  void DoSomething(T* pObj, Int2Type<false>){
+    T* pNewObj = new T(*pObj);
+    ... nonpolymorphic algorithm ...
+  }
+public:
+  void DoSomething(T* pObj){
+    DoSomething(pObj, Int2Type<isPolymorphic>());
+  }
+};
+\end{verbatim}
+
+\textbf{There is another solution, \texttt{if constexpr()}, the new
+  feature provided by c++17.}
+
+\subsection{Type-to-Type Mapping}
+
+\begin{verbatim}
+template <class T, class U>
+T* Create(const U& arg){
+  return new T(arg);
+}
+\end{verbatim}
+
+If objects of type \texttt{Widget} are untouchable legacy code and must
+take two arguments upon construction, the second being a fixed value
+such as -1. How can you specialize Create so that it treats \texttt{Widget}
+differently from all other types with a uniform interface?
+
+\begin{verbatim}
+// Illegal code — don't try this at home
+template <class U>
+Widget* Create<Widget, U>(const U& arg){
+  return new Widget(arg, -1);
+}
+
+// rely on overloading
+template <class T, class U>
+T* Create(const U& arg, T /* dummy */){
+  return new T(arg);
+}
+template <class U>
+Widget* Create(const U& arg, Widget /* dummy */){
+  return new Widget(arg, -1);
+}
+\end{verbatim}
+
+Such a solution would incur the overhead of constructing an
+arbitrarily complex object that remains unused.
+
+\begin{verbatim}
+template <typename T>
+struct Type2Type{
+  typedef T OriginalType;
+};
+template <class T, class U>
+T* Create(const U& arg, Type2Type<T>){
+  return new T(arg);
+}
+template <class U>
+Widget* Create(const U& arg, Type2Type<Widget>){
+  return new Widget(arg, -1);
+}
+// Use Create()
+String* pStr = Create("Hello", Type2Type<String>());
+Widget* pW = Create(100, Type2Type<Widget>());
+\end{verbatim}
+
+\subsection{Type Selection}
+
+Sometimes generic code needs to select one type or another, depending
+on a Boolean constant.
+
+You might want to use an \texttt{std::vector} as your back-end
+storage. Obviously, you cannot store polymorphic types by value, so
+you must store pointers. On the other hand, you might want to store
+nonpolymorphic types by value, because this is more efficient.
+
+\begin{verbatim}
+template <typename T, bool isPolymorphic>
+struct NiftyContainerValueTraits{
+  typedef T* ValueType;
+};
+template <typename T>
+struct NiftyContainerValueTraits<T, false>{
+  typedef T ValueType;
+};
+template <typename T, bool isPolymorphic>
+class NiftyContainer{
+  typedef NiftyContainerValueTraits<T, isPolymorphic> Traits;
+  typedef typename Traits::ValueType ValueType;
+};
+\end{verbatim}
+
+This way of doing things is unnecessarily clumsy. Moreover, it doesn't
+scale: For each type selection, you must define a new traits class
+template.
+
+\begin{verbatim}
+template <bool flag, typename T, typename U>
+struct Select{
+  typedef T Result;
+};
+template <typename T, typename U>
+struct Select<false, T, U>{
+  typedef U Result;
+};
+
+template <typename T, bool isPolymorphic>
+class NiftyContainer{
+  typedef typename Select<isPolymorphic, T*, T>::Result ValueType;
+}
+\end{verbatim}
+
+\subsection{Detecting Convertibility and Inheritance at Compile Time}
+
+ In a generic function, you can rely on an optimized algorithm if a
+ class implements a certain interface. Discovering this at compile
+ time means not having to use \texttt{dynamic\_cast}, which is costly
+ at runtime.
+
+ Detecting inheritance relies on a more general mechanism, that of
+ detecting convertibility. The more general problem is, How can you
+ detect whether an arbitrary type \texttt{T} supports automatic
+ conversion to an arbitrary type \texttt{U}?
+
+ There is a surprising amount of power in \texttt{sizeof}: You can
+ apply \texttt{sizeof} to any expression, no matter how complex, and
+ \texttt{sizeof} \textbf{returns its size without actually evaluating
+   that expression at runtime. }
+
+ The idea of conversion detection relies on using \texttt{sizeof} in
+ conjunction with overloaded functions. We provide two overloads of a
+ function: \textbf{One accepts the type to convert to (\texttt{U}), and the
+ other accepts just about anything else. } If the function that
+accepts a \texttt{U} gets called, we know that \texttt{T} is
+convertible to \texttt{U}.
+
+\begin{verbatim}
+typedef char Small;
+class Big { char dummy[2]; };
+Small Test(U);
+Big Test(...);
+const bool convExists = sizeof(Test(T())) == sizeof(Small);
+\end{verbatim}
+Passing a C++ object to a function with ellipses has undefined
+results, but this doesn't matter. Nothing actually calls the
+function. It's not even implemented. Recall that \texttt{sizeof} does
+not evaluate its argument.
+
+There is one little problem. If \texttt{T} makes its default constructor
+private, the expression \texttt{T()} fails to compile. Fortunately,
+there is a simple solution, just use a strawman function
+returning a \texttt{T}.  \texttt{MakeT} and \texttt{Test} not only
+don't do anything but don't even really exist at all.
+
+\begin{verbatim}
+template <class T, class U>
+class Conversion{
+  typedef char Small;
+  class Big { char dummy[2]; };
+  static Small Test(U);
+  static Big Test(...);
+  static T MakeT(); // not implemented
+public:
+  enum { exists = sizeof(Test(MakeT())) == sizeof(Small) };
+};
+cout << Conversion<size_t, vector<int> >::exists << ' ';
+// return 0, because that constructor is explicit.
+\end{verbatim}
+
+We can implement one more constant inside
+\texttt{Conversion::sameType}, which is true if \texttt{T} and
+\texttt{U} represent the same type:
+
+\begin{verbatim}
+template <class T, class U>
+class Conversion{
+  ... as above ...
+  enum { sameType = false };
+};
+template <class T>
+class Conversion<T, T>{
+public:
+  enum { exists = 1, sameType = 1 };
+};
+#define SUPERSUBCLASS(T, U) \
+(Conversion<const U*, const T*>::exists && \
+!Conversion<const T*, const void*>::sameType)
+\end{verbatim}
+
+There are only three cases in which \texttt{const U*} converts
+implicitly to \texttt{const T*}: 
+\begin{enumerate}
+\item \texttt{T} is the same type as \texttt{U}
+\item \texttt{T} is an unambiguous public base of \texttt{U}
+\item \texttt{T} is \texttt{void}.
+\end{enumerate}
+
+Using \texttt{const} in \texttt{SUPERSUBCLASS}, we're always on the
+safe side, we don't want the conversion test to fail due to
+\texttt{const} issues.
+
+Why use \texttt{SUPERSUBCLASS} and not the cuter \texttt{BASE\_OF} or
+\texttt{INHERITS}? Think with \texttt{INHERITS(T, U)} it was a
+constant struggle to say which way the test worked.
+
+\subsection{A Wrapper Around \texttt{type\_info} }
+
+tandard C++ provides the \texttt{std::type\_info} class, which gives you the
+ability to investigate object types at runtime. You typically use
+\texttt{type\_info} in conjunction with the \texttt{typeid}
+operator. The \texttt{typeid} operator returns a reference to a
+\texttt{type\_info} object:
+
+\begin{verbatim}
+void Fun(Base* pObj){
+  // Compare the two type_info objects corresponding to the type of *pObj and Derived
+  if (typeid(*pObj) == typeid(Derived)){
+    ... aha, pObj actually points to a Derived object ...
+  }
+}
+\end{verbatim}
+
+In addition to supporting the comparison operators \texttt{operator==}
+and \texttt{operator!=}, \texttt{type\_info} provides two more
+functions:
+
+\begin{enumerate}
+\item The \texttt{name} member function returns a textual
+  representation of a type, in the form of \texttt{const char*}.
+\item he before member function introduces an implementation's
+  collation ordering relationship for \texttt{type\_info} objects.
+\item The \texttt{type\_info} class disables the copy constructor and
+  assignment operator, which makes storing \texttt{type\_info} objects
+  impossible.
+\item The objects returned by \texttt{typeid} have static storage, so
+  you don't have to worry about lifetime issues.  
+\end{enumerate}
+
+You do have to worry about pointer identity, the standard does not
+guarantee that each invocation returns a reference to the same
+\texttt{type\_info} object. Consequently, you cannot compare pointers
+to \texttt{type\_info} objects. What you should do is to store pointers
+to \texttt{type\_info} objects and compare them by applying
+\texttt{type\_info::operator==} to the dereferenced pointers.
+
+If you want to use STL's ordered containers with \texttt{type\_info},
+you must write a little functor and deal with pointers. All this is
+clumsy enough to mandate a wrapper class around \texttt{type\_info}
+that stores a pointer to a \texttt{type\_info} object and provides:
+\begin{enumerate}
+\item All member functions of \texttt{type\_info}
+\item Value semantics (public copy constructor and assignment
+  operator)
+\item Seamless comparisons by defining \texttt{operator<} and
+  \texttt{operator==}
+\end{enumerate}
+
+\begin{verbatim}
+class TypeInfo{
+public:
+  // Constructors/destructors
+  TypeInfo(); // needed for containers
+  TypeInfo(const std::type_info&);
+  TypeInfo(const TypeInfo&);
+  TypeInfo& operator=(const TypeInfo&);
+  // Compatibility functions
+  bool before(const TypeInfo&) const;
+  const char* name() const;
+private:
+  const std::type_info* pInfo_;
+};
+// Comparison operators
+bool operator==(const TypeInfo&, const TypeInfo&);
+bool operator!=(const TypeInfo&, const TypeInfo&);
+bool operator<(const TypeInfo&, const TypeInfo&);
+bool operator<=(const TypeInfo&, const TypeInfo&);
+bool operator>(const TypeInfo&, const TypeInfo&);
+bool operator>=(const TypeInfo&, const TypeInfo&);
+
+void Fun(Base* pObj){
+  TypeInfo info = typeid(Derived);
+  if (typeid(*pObj) == info){
+    ... pBase actually points to a Derived object ...
+  }
+}
+\end{verbatim}
+
+\textbf{The cloning factory in Chapter 8 and one double-dispatch
+  engine in Chapter 11 put \texttt{TypeInfo} to good use. }
+
+\subsection{\texttt{NullType} and \texttt{EmptyType}}
+
+\begin{verbatim}
+class NullType {};
+struct EmptyType {};
+\end{verbatim}
+
+You can use \texttt{NullType} for cases in which a type must be there
+syntactically but doesn't have a semantic sense. You can use
+\texttt{EmptyType} as a default ("don't care") type for a template.
+
+\subsection{Type Traits}
+
+\textbf{Traits are a generic programming technique that allows
+  compile-time decisions to be made based on types, much as you would
+  make runtime decisions based on values.}
+
+\subsubsection{ Implementing Pointer Traits}
+
+\begin{verbatim}
+template <typename T>
+class TypeTraits{
+private:
+  template <class U> 
+  struct PointerTraits{
+    enum { result = false };
+    typedef NullType PointeeType;
+  };
+  template <class U> 
+  struct PointerTraits<U*>{
+    enum { result = true };
+    typedef U PointeeType;
+  };
+public:
+  enum { isPointer = PointerTraits<T>::result };
+  typedef PointerTraits<T>::PointeeType PointeeType;
+};
+
+const bool iterIsPtr = TypeTraits<vector<int>::iterator>::isPointer;
+cout << "vector<int>::iterator is " << iterIsPtr ? "fast" : "smart" << '\n';
+\end{verbatim}
+
+Similarly, TypeTraits implements an \texttt{isReference} constant and
+a \texttt{ReferencedType} type definition.
+
+Detection of pointers to members is a bit different. The
+specialization needed is as follows:
+\begin{verbatim}
+template <typename T>
+class TypeTraits{
+private:
+  template <class U> 
+  struct PToMTraits{
+    enum { result = false };
+  };
+template <class U, class V>
+  struct PToMTraits<U V::*>{
+    enum { result = true };
+  };
+public:
+  enum { isMemberPointer = PToMTraits<T>::result };
+};
+\end{verbatim}
+
+\subsubsection{Detection of Fundamental Types}
+
+\texttt{TypeTraits<T>} implements an \texttt{isStdFundamental}
+compile-time constant that says whether or not \texttt{T} is a
+standard fundamental type.
+
+In Section 3, we will know an \texttt{TypeList} and the expression
+\begin{verbatim}
+TL::IndexOf<T, TYPELIST_nn(comma-separated list of types)>::value
+\end{verbatim}
+returns the zero-based position of \texttt{T} in the list, or –1 if
+\texttt{T} does not figure in the list.
+
+\begin{verbatim}
+template <typename T>
+class TypeTraits
+{
+... as above ...
+public:
+  typedef TYPELIST_4(unsigned char, unsigned short int, unsigned int, unsigned long int) UnsignedInts;
+  typedef TYPELIST_4(signed char, short int, int, long int) SignedInts;
+  typedef TYPELIST_3(bool, char, wchar_t) OtherInts;
+  typedef TYPELIST_3(float, double, long double) Floats;
+  enum { isStdUnsignedInt = TL::IndexOf<T, UnsignedInts>::value >= 0 };
+  enum { isStdSignedInt = TL::IndexOf<T, SignedInts>::value >= 0 };
+  enum { isStdIntegral = isStdUnsignedInt || isStdSignedInt || TL::IndexOf <T, OtherInts>::value >= 0 };
+  enum { isStdFloat = TL::IndexOf<T, Floats>::value >= 0 };
+  enum { isStdArith = isStdIntegral || isStdFloat };
+  enum { isStdFundamental = isStdArith || isStdFloat || Conversion<T, void>::sameType };
+  ...
+};
+\end{verbatim}
+
+\subsubsection{Optimized Parameter Types}
+
+Given an arbitrary type \texttt{T}, what is the most efficient way of
+passing and accepting objects of type \texttt{T} as arguments to
+functions? In general, the most efficient way is to pass elaborate
+types by reference and scalar types by value.
+
+A detail that must be carefully handled is that C++ does not allow
+references to references. Thus, if \texttt{T} is already a reference,
+you should not add one more reference to it.
+
+\begin{verbatim}
+template <typename T>
+class TypeTraits{
+  ... as above ...
+public:
+  typedef Select<isStdArith || isPointer || isMemberPointer, T,ReferencedType&>::Result ParameterType;
+};
+\end{verbatim}
+
+\subsubsection{Stripping Qualifiers}
+
+\begin{verbatim}
+template <typename T>
+class TypeTraits{
+  ... as above ...
+private:
+  template <class U> struct UnConst{
+    typedef U Result;
+  };
+  template <class U> struct UnConst<const U>{
+    typedef U Result;
+  };
+public:
+  typedef UnConst<T>::Result NonConstType;
+};
+\end{verbatim}
+
+\subsubsection{Using \texttt{TypeTraits}}
+
+\begin{verbatim}
+enum CopyAlgoSelector { Conservative, Fast };
+// Conservative routine-works for any type
+template <typename InIt, typename OutIt>
+OutIt CopyImpl(InIt first, InIt last, OutIt result, Int2Type<Conservative>){
+  for (; first != last; ++first, ++result)
+  *result = *first;
+  return result;
+}
+// Fast routine-works only for pointers to raw data
+template <typename InIt, typename OutIt>
+OutIt CopyImpl(InIt first, InIt last, OutIt result, Int2Type<Fast>){
+  const size_t n = last-first;
+  BitBlast(first, result, n * sizeof(*first));
+  return result + n;
+}
+template <typename InIt, typename OutIt>
+OutIt Copy(InIt first, InIt last, OutIt result){
+  typedef TypeTraits<InIt>::PointeeType SrcPointee;
+  typedef TypeTraits<OutIt>::PointeeType DestPointee;
+  enum { copyAlgo = 
+         TypeTraits<InIt>::isPointer &&
+         TypeTraits<OutIt>::isPointer &&
+         TypeTraits<SrcPointee>::isStdFundamental &&
+         TypeTraits<DestPointee>::isStdFundamental &&
+         sizeof(SrcPointee) == sizeof(DestPointee) ? Fast : Conservative };
+  return CopyImpl(first, last, result, Int2Type<copyAlgo>);
+}
+\end{verbatim}
+
+The drawback of Copy is that it doesn't accelerate everything that
+could be accelerated. For example, you  might have a plain C-like
+struct containing nothing but primitive data—a so-called plain old
+data, or POD, structure.
+\begin{verbatim}
+template <typename T> 
+struct SupportsBitwiseCopy{
+  enum { result = TypeTraits<T>::isStdFundamental };
+};
+template<> 
+struct SupportsBitwiseCopy<MyType>{
+  enum { result = true };
+};
+template <typename InIt, typename OutIt>
+OutIt Copy(InIt first, InIt last, OutIt result, Int2Type<true>){
+  typedef TypeTraits<InIt>::PointeeType SrcPointee;
+  typedef TypeTraits<OutIt>::PointeeType DestPointee;
+  enum { useBitBlast =
+         TypeTraits<InIt>::isPointer &&
+         TypeTraits<OutIt>::isPointer &&
+         SupportsBitwiseCopy<SrcPointee>::result &&
+         SupportsBitwiseCopy<DestPointee>::result &&
+         sizeof(SrcPointee) == sizeof(DestPointee) };
+  return CopyImpl(first, last, Int2Type<useBitBlast>);
+}
+\end{verbatim}
+
+\subsubsection{Summary}
+
+The most important point is that the compiler always find the best
+match of template specialization.
 %%% Local Variables:
 %%% mode: latex
 %%% TeX-master: "../DesignPattern"
