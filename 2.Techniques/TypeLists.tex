@@ -1,0 +1,231 @@
+
+\section{Typelists}
+
+\subsection{The need for Typelists}
+
+If you want to generalize the concept of Abstract Factory and put it
+into a library,  you have to make it possible for the user to create
+factories of arbitrary collections of types.
+
+\begin{itemize}
+\item . In the Abstract Factory case, although the abstract base class
+  is quite simple, you can get a nasty amount of code duplication when
+  implementing various concrete factories.
+\item You cannot easily manipulate the member functions of
+  \texttt{WidgetFactory} \textbf{because virtual functions cannot be
+    templates.}
+\item We wish it would be nice if we could create a
+\texttt{WidgetFactory} by passing a parameter list to an
+\texttt{AbstractFactory} template and we coul have  a template-like
+invocation for various \texttt{CreateXxx} functions, such as
+\texttt{Create<Window>()}.
+\end{itemize}
+
+The definition and algorithm of \texttt{Typelist} is the same as
+\texttt{std::Tuple}
+
+\begin{verbatim}
+template <class T, class U>
+struct Typelist{
+  typedef T Head;
+  typedef U Tail;
+};
+typedef Typelist<int, NullType> OneTypeOnly;
+#define TYPELIST_1(T1) Typelist<T1, NullType>
+#define TYPELIST_2(T1, T2) Typelist<T1, TYPELIST_1(T2) >
+#define TYPELIST_3(T1, T2, T3) Typelist<T1, TYPELIST_2(T2, T3) >
+...
+\end{verbatim}
+
+There is a lot of utility algorithms of Typelist:
+\begin{itemize}
+\item Calculating length
+\begin{verbatim}
+template <class TList> struct Length;
+template <> struct Length<NullType>{
+  enum { value = 0 };
+};
+template <class T, class U>
+struct Length< Typelist<T, U> >{
+  enum { value = 1 + Length<U>::value };
+};
+\end{verbatim}
+\item  Indexed Access
+\begin{verbatim}
+template <class Head, class Tail>
+struct TypeAt<Typelist<Head, Tail>, 0>{
+  typedef Head Result;
+};
+template <class Head, class Tail, unsigned int i>
+struct TypeAt<Typelist<Head, Tail>, i>{
+  typedef typename TypeAt<Tail, i - 1>::Result Result;
+};
+\end{verbatim}
+\item Searching Typelists
+\begin{verbatim}
+template <class T>
+struct IndexOf<NullType, T>{
+  enum { value = -1 };
+};
+template <class T, class Tail>
+struct IndexOf<Typelist<T, Tail>, T>{
+  enum { value = 0 };
+};
+template <class Head, class Tail, class T>
+struct IndexOf<Typelist<Head, Tail>, T>{
+private:
+  enum { temp = IndexOf<Tail, T>::value };
+public:
+  enum { value = temp == -1 ? -1 : 1 + temp };
+};
+\end{verbatim}
+\item Appending to Typelist
+\begin{verbatim}
+template <> struct Append<NullType, NullType>{
+  typedef NullType Result;
+};
+template <class T> struct Append<NullType, T>{
+  typedef TYPELIST_1(T) Result;
+};
+template <class Head, class Tail>
+struct Append<NullType, Typelist<Head, Tail> >{
+  typedef Typelist<Head, Tail> Result;
+};
+template <class Head, class Tail, class T>
+struct Append<Typelist<Head, Tail>, T>{
+  typedef Typelist<Head,typename Append<Tail, T>::Result> Result;
+};
+\end{verbatim}
+\item Erasing a type from Typelist
+\begin{verbatim}
+template <class T>
+struct Erase<NullType, T>{
+  typedef NullType Result;
+};
+template <class T, class Tail>
+struct Erase<Typelist<T, Tail>, T>{
+  typedef Tail Result;
+};
+template <class Head, class Tail, class T>
+struct Erase<Typelist<Head, Tail>, T>{
+  typedef Typelist<Head,typename Erase<Tail, T>::Result> Result;
+};
+\end{verbatim}
+\item Erasing Duplicates
+\begin{verbatim}
+template <> struct NoDuplicates<NullType>{
+typedef NullType Result;
+};
+template <class Head, class Tail>
+struct NoDuplicates< Typelist<Head, Tail> >{
+private:
+typedef typename NoDuplicates<Tail>::Result L1;
+typedef typename Erase<L1, Head>::Result L2;
+public:
+typedef Typelist<Head, L2> Result;
+};
+\end{verbatim}
+\item Replacing a type in a Typelist
+\begin{verbatim}
+template <class T, class U>
+struct Replace<NullType, T, U>{
+  typedef NullType Result;
+};
+template <class T, class Tail, class U>
+struct Replace<Typelist<T, Tail>, T, U>{
+  typedef Typelist<U, Tail> Result;
+};
+template <class Head, class Tail, class T, class U>
+struct Replace<Typelist<Head, Tail>, T, U>{
+  typedef Typelist<Head,typename Replace<Tail, T, U>::Result> Result;
+};
+\end{verbatim}
+\item Partially Ordering Typelist
+\begin{verbatim}
+template <class T>
+struct MostDerived<NullType, T>{
+  typedef T Result;
+};
+template <class Head, class Tail, class T>
+struct MostDerived<Typelist<Head, Tail>, T>{
+private:
+  typedef typename MostDerived<Tail, T>::Result Candidate;
+public:
+  typedef typename Select<SUPERSUBCLASS(Candidate, Head), Head, Candidate>::Result Result;
+};
+template <>
+struct DerivedToFront<NullType>{
+  typedef NullType Result;
+};
+template <class Head, class Tail>
+struct DerivedToFront< Typelist<Head, Tail> >{
+private:
+  typedef typename MostDerived<Tail, Head>::Result TheMostDerived;
+  typedef typename Replace<Tail, TheMostDerived, Head>::Result L;
+public:
+  typedef Typelist<TheMostDerived, L> Result;
+};
+\end{verbatim}
+\end{itemize}
+
+\subsection{Class Generation with Typelists}
+
+\begin{verbatim}
+template <class TList, template <class> class Unit>
+class GenScatterHierarchy;
+
+template <class T1, class T2, template <class> class Unit>
+class GenScatterHierarchy<Typelist<T1, T2>, Unit>
+: public GenScatterHierarchy<T1, Unit>
+, public GenScatterHierarchy<T2, Unit>{
+public:
+  typedef Typelist<T1, T2> TList;
+  typedef GenScatterHierarchy<T1, Unit> LeftBase;
+  typedef GenScatterHierarchy<T2, Unit> RightBase;
+};
+
+template <class AtomicType, template <class> class Unit>
+class GenScatterHierarchy : public Unit<AtomicType>{
+  typedef Unit<AtomicType> LeftBase;
+};
+
+template <template <class> class Unit>
+class GenScatterHierarchy<NullType, Unit>{};
+
+template <class T>
+struct Holder{
+  T value_;
+};
+typedef GenScatterHierarchy<TYPELIST_3(int, string, Widget), Holder> WidgetInfo;
+WidgetInfo obj;
+string name = (static_cast<Holder<string>&>(obj)).value_;
+\end{verbatim}
+
+This cast is quite ugly.
+\begin{verbatim}
+template <class T, class H>
+typename Private::FieldTraits<H>::Rebind<T>::Result& Field(H& obj){
+  return obj;
+}
+\end{verbatim}
+
+ If you call \texttt{Field<Widget>(obj) }, the compiler figures out
+ that \texttt{Holder<Widget>} is a base class of \texttt{WidgetInfo} and 
+ simply returns a reference to that part of the compound object.
+
+ \subsection{Generating Tuples}
+
+\begin{verbatim}
+template <class T>
+struct TupleUnit{
+  T value_;
+  operator T&() { return value_; }
+  operator const T&() const { return value_; }
+};
+template <class TList>
+struct Tuple : public GenScatterHierarchy<TList, TupleUnit>{};
+\end{verbatim}
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "../DesignPattern"
+%%% End:
