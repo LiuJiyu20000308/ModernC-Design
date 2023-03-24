@@ -1,0 +1,270 @@
+\newpage
+\section{Small-Object Allocation}
+
+\subsection{Why we need smallObj allocation?}
+
+For various reasons, polymorphic behavior being the most important,
+these small objects cannot be stored on the stack and must live on the
+free store . C++ provides the operators \texttt{new} and
+\texttt{delete} as the primary means of using the free store.
+However, these operators are general purpose and perform badly for
+allocating small objects.
+
+For occult reasons, the default allocator (\texttt{malloc, realloc, free}) is
+notoriously slow. In addition to being slow, the genericity of the
+default C++ allocator makes it very space inefficient for small
+objects.  Usually, the bookkeeping memory amounts to a few extra bytes
+(4 to 32) for each block allocated with \texttt{new}, If you allocate
+8-byte objects, the per-object overhead becomes 50\% to 400\%.
+
+\subsection{The workings of a memory allocator}
+
+\begin{verbatim}
+struct MemControlBlock{
+  std::size_t size_;
+  bool available_;
+};
+\end{verbatim}
+
+For each allocation request, a linear search of memory blocks finds a
+suitable block for the requested size. Each deallocation incurs,
+again, a linear search for figuring out the memory block that precedes
+the block  being deallocated, and an adjustment of its size.
+
+\begin{verbatim}
+struct MemControlBlock{
+  bool available_ ;
+  MemControlBlock* prev_;
+  MemControlBlock* next_;
+};
+\end{verbatim}
+
+If you store pointers to the previous and next
+\texttt{MemControlBlock} in each \texttt{MemControlBlock}, you can
+achieve constant-time deallocation.
+
+\subsection{A Small-Object Allocator}
+
+The small-object allocator described in this chapter sports a
+four-layered structure:
+\begin{enumerate}
+\item \texttt{Chunk} contains and manages a chunk of memory consisting
+  of an integral number of fixedsize blocks. \texttt{Chunk} contains
+  logic that allows you to allocate and deallocate memory blocks
+\item A \texttt{FixedAllocator} object uses \texttt{Chunk} as a
+  building block. \texttt{FixedAllocator}'s primary purpose is to
+  satisfy memory requests that go beyond a \texttt{Chunk}'s
+  capacity. \texttt{FixedAllocator} does this by aggregating an array
+  of \texttt{Chunk}s.
+\item \texttt{SmallObjAllocator} provides general allocation and
+  deallocation functions. A \texttt{SmallObjAllocator} holds several
+  \texttt{FixedAllocator} objects, each specialized for allocating
+  objects of one size.
+\item Finally, \texttt{SmallObject} wraps \texttt{FixedAllocator} to
+  offer encapsulated allocation services for C++ classes. SmallObject
+  overloads operator \texttt{new} and operator \texttt{delete} and
+  passes them to a \texttt{SmallObjAllocator} object. 
+\end{enumerate}
+
+\subsection{Chunk}
+
+\begin{verbatim}
+struct Chunk{
+  void Init(std::size_t blockSize, unsigned char blocks);
+  void* Allocate(std::size_t blockSize);
+  void Deallocate(void* p, std::size_t blockSize);
+  void Reset(std::size_t blockSize, unsigned char blocks);
+  void Release();
+  unsigned char* pData_;
+  unsigned char firstAvailableBlock_, blocksAvailable_;
+};
+\end{verbatim}
+
+\texttt{firstAvailableBlock\_}  holds the index of the first block
+available in this chunk, \texttt{blocksAvailable\_} holds the number of
+blocks available in this chunk.
+
+\texttt{Chunk} does not define constructors, destructors, or assignment
+operator. Defining proper copy semantics at this level hurts
+efficiency at upper level. Allocating and deallocating a
+block inside a Chunk takes constant time.
+
+Why we use \texttt{unsinged char} but not \texttt{unsigned short} (2
+bytes on many machines):
+\begin{enumerate}
+\item We cannot allocate blocks smaller than \texttt{sizeof(unsigned
+    short)}, which is awkward because we're building a small-object
+  allocator.
+\item Imagine you build an allocator for 5-byte blocks. In this case,
+casting a pointer that points to such a 5-byte block to unsigned int
+engenders undefined behavior.
+\end{enumerate}
+
+\subsection{FixedAllocator}
+
+\begin{verbatim}
+class FixedAllocator{
+private:
+    // Internal functions        
+    void DoDeallocate(void* p);
+    Chunk* VicinityFind(void* p);
+
+    std::size_t blockSize_;
+    unsigned char numBlocks_;
+    typedef std::vector<Chunk> Chunks;
+    Chunks chunks_;
+    Chunk* allocChunk_;
+    Chunk* deallocChunk_;
+
+    // For ensuring proper copy semantics
+    mutable const FixedAllocator* prev_;
+    mutable const FixedAllocator* next_;
+public:
+    explicit FixedAllocator(std::size_t blockSize = 0);
+    FixedAllocator(const FixedAllocator&);
+    FixedAllocator& operator=(const FixedAllocator&);
+    ~FixedAllocator();
+    void Swap(FixedAllocator& rhs);
+
+    // Allocate a memory block
+    void* Allocate();
+    void Deallocate(void* p);
+    std::size_t BlockSize() const{ return blockSize_; }
+};
+\end{verbatim}
+
+\texttt{allocChunk\_} holds a pointer to the last chunk that was used
+for an allocation. Whenever an allocation request comes,
+\texttt{FixedAllocator::Allocate} first checks \texttt{allocChunk\_}
+for available space. If not, a linear search occurs.
+
+ \texttt{deallocChunk\_} points to the last \texttt{Chunk} object that
+ was used for a deallocation. Whenever a deallocation occurs,
+ \texttt{deallocChunk\_} is checked first. Then, if it's the wrong
+ chunk, \texttt{Deallocate} performs a linear search:
+ \begin{enumerate}
+ \item during deallocation, a chunk is freed only when there are two
+empty chunks.
+\item \texttt{chunks\_} is searched starting from
+  \texttt{deallocChunk\_} and going up and down with two iterators.
+\end{enumerate}
+
+\subsection{SmallObjAllocator}
+\begin{verbatim}
+class SmallObjAllocator{
+public:
+  SmallObjAllocator(std::size_t chunkSize,std::size_t maxObjectSize);
+  void* Allocate(std::size_t numBytes);
+  void Deallocate(void* p, std::size_t size);
+private:
+  std::vector<FixedAllocator> pool_;
+  FixedAllocator* pLastAlloc_;
+  FixedAllocator* pLastDealloc_;
+  std::size_t chunkSize_;
+  std::size_t maxObjectSize_;
+};
+\end{verbatim}
+
+The \texttt{chunkSize} parameter is the default chunk size (the length
+in bytes of each Chunk object), and \texttt{maxObjectSize} is the
+maximum size of objects that must be considered to be "small."
+\texttt{SmallObjAllocator} forwards requests 
+for blocks larger than \texttt{maxObjectSize} directly to
+\texttt{::operator new}.
+
+We store \texttt{FixedAllocators }only for sizes that are requested at
+least once. This way \texttt{pool\_} can accommodate
+various object sizes without growing too much. To improve lookup
+speed, \texttt{pool\_} is kept sorted by block.
+size.
+
+When an allocation request arrives, \texttt{pLastAlloc\_} is checked first. If
+it is not of the correct size, \texttt{SmallObjAllocator::Allocate}
+performs a binary search in \texttt{pool\_}. Deal location requests are 
+handled in a similar way.
+
+\subsection{Small Object}
+
+\begin{verbatim}
+class SmallObject{
+public:
+  static void* operator new(std::size_t size);
+  static void operator delete(void* p, std::size_t size);
+  virtual ~SmallObject() {}
+};
+\end{verbatim}
+
+ In standard C++ you can overload the default operator delete in two
+ ways—either as
+\begin{verbatim}
+void operator delete(void* p);
+\end{verbatim}
+or as
+\begin{verbatim}
+void operator delete(void* p, std::size_t size);
+\end{verbatim}
+
+ To avoid the overhead of storing the size of the actual object to
+ which p points, the compiler does a hat trick: It generates code that
+ figures out the size on the fly. Four possible techniques of
+ achieving that are listed here:
+ \begin{enumerate}
+ \item Pass a Boolean flag to the destructor meaning "Call/don't call
+   operator delete after destroying the object." Base's destructor is
+   virtual, so, \texttt{delete p} will reach the right object,
+   \texttt{Derived}. At that time, the size of the object is known
+   statically—it's \texttt{sizeof(Derived)}, and the compiler simply
+   passes this constant to operator \texttt{delete}.
+ \item You can arrange that each destructor, after destroying the
+   object, returns \texttt{sizeof(Class)}.
+ \item Implement a hidden virtual member function that gets the size
+   of an object, say \texttt{\_Size()}.  
+ \item Store the size directly somewhere in the virtual function table
+   (vtable) of each class. This solution is both flexible and
+   efficient, but less easy to implement.
+ \end{enumerate}
+
+ We need a unique \texttt{SmallObjAllocator} object for the whole
+ application. That \texttt{SmallObjAllocator} must be properly
+ constructed and properly destroyed, which is a thorny issue on its
+ own. we solve this problem thoroughly with its
+ \texttt{SingletonHolder} template.
+
+\begin{verbatim}
+typedef Singleton<SmallObjAllocator> MyAlloc;
+void* SmallObject::operator new(std::size_t size){
+  return MyAlloc::Instance().Allocate(size);
+}
+void SmallObject::operator delete(void* p, std::size_t size){
+  MyAlloc::Instance().Deallocate(p, size);
+}
+\end{verbatim}
+
+ \subsection{Multithreading issues}
+
+The unique \texttt{SmallObjAllocator} is shared by all instances of
+\texttt{SmallObject}. If these instances belong to different threads,
+we end up sharing the \texttt{SmallObjAllocator} between multiple
+threads.
+
+\begin{verbatim}
+template <template <class T> class ThreadingModel>
+class SmallObject : public ThreadingModel<SmallObject>{
+  ... as before ...
+}
+
+template <template <class T> class ThreadingModel>
+void* SmallObject<ThreadingModel>::operator new(std::size_t size){
+  Lock lock;
+  return MyAlloc::Instance().Allocate(size);
+}
+template <template <class T> class ThreadingModel>
+void SmallObject<ThreadingModel>::operator delete(void* p, std::size_t size){
+  Lock lock;
+  MyAlloc::Instance().Deallocate(p, size);
+}
+\end{verbatim}
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "../DesignPattern"
+%%% End:
