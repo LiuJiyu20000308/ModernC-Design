@@ -126,7 +126,7 @@ FixedAllocator::FixedAllocator(std::size_t blockSize)
     assert(blockSize_ > 0);
     
     prev_ = next_ = this;
-
+    
     std::size_t numBlocks = DEFAULT_CHUNK_SIZE / blockSize;
     if (numBlocks > UCHAR_MAX) numBlocks = UCHAR_MAX;
     else if (numBlocks == 0) numBlocks = 8 * blockSize;

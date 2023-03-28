@@ -1,6 +1,6 @@
 doc : DesignPattern.tex
-	xelatex $<
-	xelatex $<
+	pdflatex $<
+	pdflatex $<
 	make clean
 
 clean:

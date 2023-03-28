@@ -1,4 +1,4 @@
-\documentclass[a4paper,twoside]{ctexart}
+\documentclass[a4paper,twoside]{article}
 \usepackage{geometry}
 \geometry{margin=1cm,vmargin={0pt,1cm}}
 \setlength{\topmargin}{-2cm}
@@ -57,14 +57,22 @@
   }
 }
 
-\newtheorem{theorem}{定理}[section]
-\newtheorem{corollary}[theorem]{推论}
-\newtheorem{lemma}[theorem]{引理}
-\newtheorem{definition}[theorem]{定义}
-\newtheorem{proposition}[theorem]{性质}
-\newtheorem{example}[theorem]{例子}
-\newtheorem{notation}[theorem]{记号}
-\newtheorem{algorithm}[theorem]{算法}
+
+% -------------------
+% Theorem Environments
+% -------------------
+\theoremstyle{definition}
+\newtheorem{thm}{Theorem}[section]
+\newtheorem{prop}{Proposition}[section]
+\newtheorem{lem}{Lemma}[section]
+\newtheorem{coro}{Corollary}[section]
+
+\newtheorem{exm}{Example}[section]
+\newtheorem{nex}{Non-Example}[section]
+\newtheorem{defn}{Definition}[section]
+\theoremstyle{remark}
+\newtheorem{rmk}{Remark}[section] 
+\numberwithin{equation}{section}
 
 
 \newcommand{\dif}{\mathrm{d}}
@@ -146,7 +154,6 @@
 \egroup}
 \makeatother
 
-\CTEXsetup[format={\Large\bfseries}]{section}
 
 \title{Modern C++ Design}
 
@@ -161,6 +168,8 @@
 \input{2&3.Techniques/TypeLists}
 
 \input{4.SmallObj/SmallObj}
+
+\input{5.Functor/Functor}
 
 \end{document}
 %%% Local Variables:
