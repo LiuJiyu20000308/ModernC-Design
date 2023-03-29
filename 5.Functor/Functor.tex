@@ -355,6 +355,81 @@ int main(){
   cmd2();
 }
 \end{verbatim}
+
+\subsection{Binding}
+
+As soon as \texttt{Functor} is ready, new ideas come to mind. For
+instance, we'd like to be able to convert from a type of
+\texttt{Functor} to another. Think of a \texttt{Functor} as a
+computation, and of its arguments as the \textbf{environment}
+necessary to perform that computation,  binding allows
+\texttt{Functor} to store part of the \textbf{environment} together
+with the computation and to reduce progressively the environment
+necessary at invocation time.
+
+\begin{verbatim}
+template <class Incoming>
+class BinderFirst : public FunctorImpl<typename Incoming::ResultType, 
+                     typename Incoming::Arguments::Tail>{
+  typedef Functor<typename Incoming::ResultType,Incoming::Arguments::Tail> Outgoing;
+  typedef typename Incoming::Parm1 Bound;
+  typedef typename Incoming::ResultType ResultType;
+public:
+  BinderFirst(const Incoming& fun, Bound bound): fun_(fun), bound_(bound){}
+  BinderFirst* Clone() const{ return new BinderFirst(*this); }
+  ResultType operator()(){ return fun_(bound_); }
+  ResultType operator()(typename Outgoing::Parm1 p1){
+    return fun_(bound_, p1);
+  }
+  ResultType operator()(typename Outgoing::Parm1 p1,typename Outgoing::Parm2 p2){
+    return fun_(bound_, p1, p2);
+  }
+private:
+  Incoming fun_;
+  Bound bound_;
+};
+
+template <class Fctor>
+typename Private::BinderFirstTraits<Fctor>::BoundFunctorType
+BindFirst(const Fctor& fun,typename Fctor::Parm1 bound){
+  typedef typename private::BinderFirstTraits<Fctor>::BoundFunctorType Outgoing;
+  return Outgoing(std::auto_ptr<typename Outgoing::Impl>(
+                    new BinderFirst<Fctr>(fun, bound)));
+}
+\end{verbatim}
+
+
+\subsection{Chaining Request}
+
+\texttt{MacroCommand} class, a command that holds a
+linear collection (such as a list or a vector) of
+\texttt{Commands}. When a \texttt{MacroCommand} is executed, it
+executes in sequence each of the commands that it holds.
+
+
+\subsection{\texttt{Functor} Quick Facts}
+
+\begin{itemize}
+\item You can initialize a\texttt{ Functor} with a function, a
+  functor, another Functor, or a pointer to an object and a pointer to
+  a method.
+\item You also can initialize \texttt{Functor} with a
+  \texttt{std::auto\_ptr< FunctorImpl<R,TList> >}.
+\item \texttt{Functor} supports automatic conversions for arguments
+  and return values.
+\item Manual disambiguation is needed in the presence of overloading.
+\item \texttt{Functor} fully supports first-class semantics: copying,
+  assigning to, and passing by value.
+\item \texttt{Functor} is not polymorphic and is not intended to be
+  derived from. If you want to extend \texttt{Functor}, derive from
+  \texttt{FunctorImpl}.
+\item  A call to \texttt{BindFirst} binds the first argument to a
+  fixed value.
+\item Multiple \texttt{Functors} can be chained in a single
+  \texttt{Functor} object by using the \texttt{Chain} function. 
+\item \texttt{FunctorImpl} uses the small-object allocator.
+\end{itemize}
+
 %%% Local Variables:
 %%% mode: latex
 %%% TeX-master: "../DesignPattern"
