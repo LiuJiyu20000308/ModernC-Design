@@ -14,12 +14,13 @@
 \setlength{\parindent}{0.5em}
 
 \pagenumbering{arabic} 
-
+\usepackage{pdfpages}
 % useful packages.
+\usepackage{color}
 \usepackage{multirow}
 \usepackage{caption}
 \usepackage{mathrsfs}
-\usepackage{amsfonts}
+ \usepackage{amsfonts}
 \usepackage{amsmath}
 \usepackage{amsthm}
 \usepackage{enumerate}
@@ -138,6 +139,9 @@
 
 \newcommand{\Pyr}[2]{\textrm{Pyr}_{\cal{#1}}\left(\mathbf{#2}\right)}
 
+\let\OldTexttt\texttt
+\renewcommand{\texttt}[1]{{\color{blue} \OldTexttt{#1}}}
+
 %\pagestyle{plain}
 \pagestyle{fancy}
 \fancyhf{}
@@ -172,6 +176,11 @@
 \input{5.Functor/Functor}
 
 \input{6.Singleton/Singleton}
+
+\input{7.SmartPointer/SmartPointer}
+
+\section{Factory}
+\includepdf[pages=-]{8.Factory/factory.pdf}
 \end{document}
 %%% Local Variables:
 %%% mode: xelatex

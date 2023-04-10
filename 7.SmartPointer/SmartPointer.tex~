@@ -1,0 +1,348 @@
+\newpage
+
+\section{Smart Pointer}
+
+A smart pointer is a C++ class that mimics a regular pointer in syntax
+and some semantics, but it does more.
+\begin{verbatim}
+template <class T>
+class SmartPtr{
+public:
+  explicit SmartPtr(T* pointee) : pointee_(pointee);
+  SmartPtr& operator=(const SmartPtr& other);
+  ~SmartPtr();
+  T& operator*() const{
+    ...
+    return *pointee_;
+  }
+  T* operator->() const{
+    ...
+    return pointee_;
+  }
+private:
+  T* pointee_;
+  ...
+};
+\end{verbatim}
+
+\texttt{SmartPtr<T>} aggregates a pointer to \texttt{T} in its member
+variable \texttt{pointee\_}. That's what most smart pointers do. In
+some cases, a smart pointer might aggregate some handles to data and
+compute the pointer on the fly.
+
+\subsection{The Deal with Smart Pointer}
+
+\textbf{Smart pointers have value semantics, whereas some simple
+pointers do not, which means you can \emph{copy} and \emph{assign
+  to}}.
+
+\begin{verbatim}
+Widget* p = new Widget;
+\end{verbatim}
+the variable p not only points to, but also owns, the memory allocated
+for the \texttt{Widget} object, because later you must issue delete p
+to ensure that the Widget object is destroyed and its memory is 
+released. Furthermore, when you copy p into another variable, all you
+get is two raw pointers pointing to the same object, and you have to
+track them even more carefully because double deletions are even more
+catastrophic than no deletion.
+
+Smart pointers can be of great help in this area. Most smart pointers
+offer \textbf{ownership management} in addition to pointer-like
+behavior. Smart pointers can figure out how ownership evolves, and their
+destructors can release the memory according to a well-defined
+strategy:
+\begin{itemize}
+\item Some
+smart pointers transfer ownership automatically: after you copy a
+smart pointer to an object, the source smart pointer becomes
+null. This is the behavior implemented by the standard-provided
+\texttt{std::auto\_ptr}.
+\item Other smart pointers implement reference counting: They track
+  the total count of smart pointers that point to the same object, and
+  when this count goes down to zero, they delete the pointed-to object.
+\end{itemize}
+
+However, you will find that adding seemingly worthwhile features might
+expose the clients to costly risks.
+
+\subsection{Storage (Policy) of Smart Pointers}
+
+There are two generalizations of smart pointers:
+
+Firstly, When you apply \texttt{operator->} to a type that's not a
+built-in pointer, the compiler does an interesting thing. After
+looking up and applying the user-defined \texttt{operator->} to that
+type, it applies \texttt{operator->} again to the result. So \textbf{a
+smart pointer's \texttt{operator->} does not have to return a
+pointer.}
+
+Secondly,  in rare cases, smart pointers could drop the pointer
+syntax. An object that does not define \texttt{operator->} and
+\texttt{operator*} violates the definition of a smart pointer, but
+there are objects that \textbf{do deserve smart pointer–like
+treatment}, although they are not, strictly speaking, smart pointers.
+
+For example, in real-world APIs and applications, many operating
+systems foster handles as accessors to certain internal resources.
+Handles are intentionally obfuscated pointers, one of their purposes
+is to prevent their users from manipulating critical operating system
+resources directly.  Most of the time, handles are integral values
+that are indices in a hidden table of pointers. The table provides the
+additional level of indirection that protects the inner system from
+the application programmers. Although they don't provide an
+\texttt{operator->}, handles resemble pointers in semantics and in the
+way they are managed.
+
+To generalize the type universe of smart pointers, we distinguish
+three potentially distinct types in a smart pointer:
+\begin{enumerate}
+\item \textbf{The storage type}. This is the type of
+  \texttt{pointee\_}. By "default"—in regular smart pointers—it is a
+  raw pointer. 
+\item \textbf{The pointer type}. This is the type returned by
+  \texttt{operator->}. It can be different from the storage type if
+  you want to return a proxy object instead of just a pointer. (You
+  will find an example of using proxy objects later in this chapter.)
+\item \textbf{The reference type}. This is the type returned by
+  \texttt{operator*}
+\end{enumerate}
+There three types are called Storage policy.
+
+\subsection{Smart Pointer Member Functions}
+
+Many existing smart pointer implementations allow operations through
+member functions, such as \texttt{Get} for accessing the
+\texttt{pointee} object, \texttt{Set} for changing it, and
+\texttt{Release} for taking over ownership.
+
+However, the interaction between member function calls for the smart
+pointer for the pointed-to object can be extremely confusing.
+\begin{verbatim}
+SmartPtr<Printer> spRes = ...;
+spRes->Acquire(); // acquire the printer
+spRes->Release(); // release the printer
+spRes.Release(); // release the pointer to the printer
+\end{verbatim}
+
+Both \texttt{sp.Release()} and \texttt{sp->Release()} compile
+flag-free but do very different things. The cure is simple: \textbf{A smart
+pointer should not use member functions.} \texttt{SmartPtr} use only 
+nonmember functions. These functions become friends of the smart
+pointer class. 
+
+The only functions that necessarily remain members of
+\texttt{SmartPtr} are the constructors, the destructor,
+\texttt{operator=}, \texttt{operator->}, and unary
+\texttt{operator*}. All other operations of SmartPtr are provided
+through named nonmember functions.
+\begin{verbatim}
+template <class T> T* GetImpl(SmartPtr<T>& sp);
+template <class T> T*& GetImplRef(SmartPtr<T>& sp);
+template <class T> void Reset(SmartPtr<T>& sp, T* source);
+template <class T> void Release(SmartPtr<T>& sp, T*& destination);
+\end{verbatim}
+
+\begin{itemize}
+\item \texttt{GetImpl} returns the pointer object stored by \texttt{SmartPtr}.
+\item \texttt{GetImplRef} returns a reference to the pointer object stored by
+  \texttt{SmartPtr}. GetImplRef allows you to change the underlying pointer, so
+  it requires extreme care in use.
+\item \texttt{Reset} resets the underlying pointer to another value,
+  releasing the previous one. 
+\item \texttt{Release} releases ownership of the smart pointer, giving
+  its user the responsibility of managing the pointee object's lifetime.
+\end{itemize}
+
+\subsection{Ownership (Policy) Strategies}
+
+A smart pointer is a first-class value that takes care of deleting the
+pointed-to object under the covers.  For implementing self-ownership,
+smart pointers must carefully track the pointee object, especially
+during copying, assignment, and destruction.
+
+\subsubsection{Deep Copy}
+The simplest strategy applicable is to copy the pointee object
+whenever you copy the smart pointer. If you ensure this, \textbf{there is only
+  one smart pointer for each pointee object. } But why would you make
+the effort of using a smart pointer, when simple pass by value of the
+pointee object works just as well?
+
+The answer is \textbf{support for polymorphism.} Smart pointers are
+vehicles for transporting polymorphic objects safely. When you
+copy the smart pointer, you want to copy its polymorphic behavior,
+too.
+
+However,  the following naive implementation of the
+copy constructor is wrong:
+\begin{verbatim}
+template <class T>
+class SmartPtr{
+public:
+  SmartPtr(const SmartPtr& other): pointee_(new T(*other.pointee_)){}
+};
+\end{verbatim}
+The copy constructor above copies only the \texttt{Widget} part of
+the \texttt{ExtendedWidget} object. This phenomenon is known as
+\textbf{slicing}.
+
+Chapter 8 discusses cloning in depth. As shown there, the classic way
+of obtaining a polymorphic clone for a hierarchy is to define a
+virtual \texttt{Clone} function and implement it as follows:
+\begin{verbatim}
+class AbstractBase{
+  virtual Base* Clone() = 0;
+};
+class Concrete : public AbstractBase{
+  virtual Base* Clone(){ return new Concrete(*this); }
+};
+\end{verbatim}
+
+A generic smart pointer cannot count on knowing the exact name of the
+cloning member function—maybe  it's \texttt{clone}, or maybe
+\texttt{MakeCopy}. Therefore, the most flexible approach is to
+parameterize \texttt{SmartPtr} with a policy that addresses cloning.
+
+\subsubsection{Copy on Write}
+Copy on write is an optimization technique that avoids unnecessary
+object copying. The idea that underlies COW is to \textbf{clone the pointee
+object at the first attempt of modification; until then, several
+pointers can share the same object.}
+
+Smart pointers, however, are not the best place to implement COW,
+because smart pointers cannot differentiate between calls to const and
+non-const member functions of the pointee object. (\emph{pointer to
+  non-const object can also call const member function}).
+
+\subsubsection{Reference Counting}
+
+Reference counting tracks the number of smart pointers that point to
+the same object. When that number goes to zero, the pointee object is
+deleted. This strategy works very well if you don't break certain
+rules—\textbf{you should not keep dumb pointers and smart
+  pointers to the same object.}
+
+There are three structures:
+\begin{itemize}
+\item Each smart pointer holds \textbf{a pointer to the
+reference counter}  in addition to the pointer to the object
+itself. This usually \textbf{doubles the size of the smart pointer},
+which may or may not be an acceptable amount of overhead, depending on
+your needs and constraints.
+
+There is another, subtler overhead issue. Reference-counted smart
+pointers must store the reference counter on the free
+store. \textbf{The problem is that in many implementations, the
+  default C++ free store allocator is remarkably slow and wasteful of
+  space when it comes to allocating small objects.}
+\item The relative size overhead can be partially mitigated by holding
+  the pointer and the reference count together, the structure  in the
+  following figure reduces
+  the size of the smart pointer to that of a pointer, but at the
+  expense of access speed.
+  \begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{fig/refCounter2.png}
+  \end{figure}
+\item The most efficient solution is to hold the reference counter in
+  the pointee object itself, as shown in the following figure.
+   \begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{fig/refCounter3.png}
+  \end{figure}
+  
+  However, you must design up front or modify the pointee class to
+  support reference counting. For implementing nonintrusive reference
+  counting, the small-object allocator presented in Chapter 4 can help
+  a great deal. 
+\end{itemize}
+
+\subsubsection{Reference Linking}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{fig/refLinking.png}
+ \end{figure}
+
+When you create a new \texttt{SmartPtr} from an existing
+\texttt{SmartPtr}, the new object is appended to the list;
+\texttt{SmartPtr}'s destructor takes care of removing the destroyed
+object from the list. 
+
+You cannot use a singly linked list or vector because removals from
+such a list take linear time.
+
+The advantage of reference linking over reference counting is that the
+former does not use extra free store, which makes it more reliable:
+Creating a reference-linked smart pointer cannot fail.
+
+The disadvantage is that reference linking needs more memory for its
+bookkeeping and reference counting should be a bit speedier. You
+should use reference linking only when the free store is scarce.
+
+There is  a significant disadvantage of reference management—be it
+counting or linking—is \textbf{a victim of the resource leak known as
+  cyclic reference}.  Imagine an object \texttt{A} holds a smart
+pointer to an object \texttt{B}. Also, object \texttt{B} holds a smart
+pointer to \texttt{A}. The reference management strategy cannot detect
+such cyclic references, and the two objects remain allocated forever.
+
+\subsubsection{Destructive Copy}
+
+Destructive copy does exactly what you think it does: During copying,
+it destroys the object being copied. Smart pointers may use
+destructive copy to ensure that at any time there is only one smart
+pointer pointing to a given object.
+\begin{verbatim}
+template <class T>
+class SmartPtr{
+public:
+  SmartPtr(SmartPtr& src){
+    pointee_ = src.pointee_;
+    src.pointee_ = 0;
+  }
+  SmartPtr& operator=(SmartPtr& src){
+    if (this != &src){
+      delete pointee_;
+      pointee_ = src.pointee_;
+      src.pointee_ = 0;
+    }
+    return *this;
+  }
+};
+\end{verbatim}
+
+C++ etiquette calls for the right-hand side of the copy constructor
+and the assignment operator to be a reference to a \texttt{const}
+object. Classes that foster destructive copy break this convention for
+obvious reasons.
+
+Because they do not support value semantics, smart pointers with
+destructive copy cannot be stored in containers and in general must be
+handled with almost as much care as raw pointers.
+
+On the bright side, smart pointers with destructive copy have
+significant advantages:
+\begin{itemize}
+\item \textbf{They incur almost no overhead. }
+\item \textbf{They are good at enforcing ownership transfer
+    semantics.} In this 
+  case, you use the "maelstrom effect" described earlier to your
+  advantage: You make it clear that your function takes over the
+  passed-in pointer.
+\item \textbf{They are good as return values from functions.} If the smart
+  pointer implementation uses a certain trick, you can return smart
+  pointers with destructive copy from functions. This way, you can be
+  sure that the pointee object gets destroyed if the caller doesn't
+  use the return value.
+\item They are excellent as stack variables in functions that have
+  multiple return paths. You don't have to remember to delete the
+  pointee object manually—the smart pointer takes care of this for
+  you. 
+\end{itemize}
+The destructive copy strategy is used by the standard-provided
+\texttt{std::auto\_ptr}.  
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "../DesignPattern"
+%%% End:
